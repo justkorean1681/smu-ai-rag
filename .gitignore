@@ -1,0 +1,7 @@
+.langgraph_api
+__pycache__
+.venv
+.env
+qdrant_db
+database
+ai_service_rag.egg-info
