@@ -1,6 +1,11 @@
 import os
 import sys
 from pathlib import Path
+import ast
+import re
+import pandas as pd
+import altair as alt
+
 
 # src 디렉토리를 Python 경로에 추가
 src_dir = Path(__file__).parent.parent
@@ -15,11 +20,87 @@ load_dotenv()
 
 graph = create_graph()
 
+def display_visualization(db_results):
+    if not db_results:
+        return
+
+    try:
+        data_to_plot = db_results
+        
+        if isinstance(db_results, str):
+            cleaned_str = re.sub(r"Decimal\(['\"](.*?)['\"]\)", r"\1", db_results)
+            try:
+                data_to_plot = ast.literal_eval(cleaned_str)
+            except Exception:
+                pass 
+
+        if not isinstance(data_to_plot, list) or len(data_to_plot) == 0:
+            return
+
+        df = pd.DataFrame(data_to_plot)
+        
+        numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
+        string_cols = df.select_dtypes(exclude=['number']).columns.tolist()
+
+        if numeric_cols and string_cols:
+            chart_df = pd.DataFrame({
+                'Category': df[string_cols[0]].astype(str),
+                'Value': df[numeric_cols[0]]
+            })
+
+
+            with st.expander("📊 데이터 시각화 리포트 보기", expanded=False):
+                
+                base = alt.Chart(chart_df).encode(
+                    x=alt.X('Value:Q', 
+                            axis=alt.Axis(labels=False, grid=False, domain=False, ticks=False, title='')),
+                    y=alt.Y('Category:N', 
+                            sort='-x', 
+                            axis=alt.Axis(grid=False, domain=False, ticks=False, labelFontSize=14, labelFontWeight='bold', labelPadding=10, title='', labelLimit=300)),
+                    tooltip=['Category', 'Value']
+                ).properties(
+                    height=max(250, len(chart_df) * 45) 
+                )
+
+                bars = base.mark_bar(cornerRadiusEnd=6).encode(
+                    color=alt.Color('Value:Q', 
+                                    scale=alt.Scale(scheme='greys'), 
+                                    legend=None) 
+                )
+
+                text = base.mark_text(
+                    align='left',
+                    baseline='middle',
+                    dx=10, 
+                    fontSize=14,
+                    fontWeight='bold',
+                    color='#333333'
+                ).encode(
+                    text='Value:Q'
+                )
+
+                final_chart = (bars + text).configure_view(strokeWidth=0)
+
+                st.altair_chart(final_chart, use_container_width=True)
+
+    except Exception as e:
+        st.error(f"⚠️ 차트 그리기 실패: {e}")
+
 def init_session_state():
     """세션 상태 초기화"""
     if "messages" not in st.session_state:
-        st.session_state.messages = []
+        st.session_state.messages = [
+            {
+                "role": "assistant", 
+                "content": "안녕하세요! 🛡️ **ISMS-P 인사이트 AI 에이전트**입니다.\n\nISMS-P 인증 기준에 대한 **가이드라인 해석(문서 검색)**부터 **결함 통계 현황(DB 검색)**까지 무엇이든 물어보세요!"
+            }
+        ]
+    
+    if "selected_prompt" not in st.session_state:
+        st.session_state.selected_prompt = None
 
+def set_prompt(prompt_text):
+    st.session_state.selected_prompt = prompt_text
 
 def display_message(role: str, content: str, workflow_info: dict = None):
     """메시지 표시"""
@@ -28,6 +109,10 @@ def display_message(role: str, content: str, workflow_info: dict = None):
 
         # 워크플로 정보가 있으면 표시 (assistant 메시지에만)
         if role == "assistant" and workflow_info:
+            
+            if workflow_info.get("db_results"):
+                display_visualization(workflow_info["db_results"])
+                
             display_workflow_info(workflow_info)
 
 
@@ -85,12 +170,13 @@ def display_workflow_info(result: dict):
 def main():
     """메인 함수"""
     st.set_page_config(
-        page_title="천안시 AI 에이전트",
-        page_icon="🏛️",
-        layout="wide"
+        page_title="ISMS-P AI 에이전트",
+        page_icon="🛡️",
+        layout="wide",
+        initial_sidebar_state="expanded"
     )
 
-    st.title("🏛️ 천안시 AI 에이전트 워크플로")
+    st.title("🛡️ ISMS-P AI 에이전트 워크플로")
     st.markdown("---")
 
     # 사이드바 - 환경 변수 확인
@@ -112,24 +198,27 @@ def main():
 
         st.markdown("---")
         st.header("📖 사용 방법")
-        st.markdown("""
-        **일반 질문:**
-        - "안녕하세요"
-        - "고마워"
+        with st.expander("🗣️ 일반 대화", expanded=True): # 첫 번째는 열어두기
+            st.button("안녕하세요.", on_click=set_prompt, args=("안녕하세요.",), use_container_width=True)
+            st.button("오늘 날씨 어때?", on_click=set_prompt, args=("오늘 날씨 어때?",), use_container_width=True)
 
-        **벡터 검색 (예: 문서):**
-        - "천안시 주요 사업 계획은?"
-        - "천안시 복지 정책에 대해 알려주세요"
-        - "두정동 공영주차장은 언제 완공되나요?"
+        with st.expander("🔍 가이드라인 문서 검색", expanded=False):
+            st.button("1.1.1 항목의 확인 사항은?", on_click=set_prompt, args=("ISMS-P 인증 기준 1.1.1 항목의 주요 확인 사항은?",), use_container_width=True)
+            st.button("비밀번호 작성 가이드라인", on_click=set_prompt, args=("비밀번호 작성 규칙에 대한 가이드라인을 알려줘.",), use_container_width=True)
+            st.button("경영진 참여 요건", on_click=set_prompt, args=("경영진 참여 요건이 뭐야?",), use_container_width=True)
 
-        **DB 검색 (예: 정보):**
-        - "복지정책국에는 어떤 부서가 있나요?"
-        - "본관 1층에 위치한 부서들의 전화번호는?"
-        - "041-521-2080 이 전화번호 어디인가요?"
-        """)
+        with st.expander("📊 결함 통계 DB 검색", expanded=False):
+            st.button("결함이 가장 많은 통제영역 Top3", on_click=set_prompt, args=("가장 결함이 많이 발생한 통제영역 Top 3를 알려줘.",), use_container_width=True)
+            st.button("결함 20건 이상인 통제영역은?", on_click=set_prompt, args=("결함 발생 건수가 20건 이상인 통제영역은 어디야?",), use_container_width=True)
+            st.button("10.4 접근통제 영역의 결함 수는?", on_click=set_prompt, args=("10.4 접근통제 영역의 결함 건수는 몇 개야?",), use_container_width=True)
 
-        if st.button("대화 초기화", type="secondary"):
-            st.session_state.messages = []
+        if st.button("🔄 대화 내용 초기화", type="primary", use_container_width=True):
+            st.session_state.messages = [
+                {
+                    "role": "assistant", 
+                    "content": "안녕하세요! 🛡️ **ISMS-P 인사이트 AI 에이전트**입니다.\n\nISMS-P 인증 기준에 대한 **가이드라인 해석(문서 검색)**부터 **결함 통계 현황(DB 검색)**까지 무엇이든 물어보세요!"
+                }
+            ]
             st.rerun()
 
     # 세션 상태 초기화
@@ -144,11 +233,20 @@ def main():
         )
 
     # 사용자 입력
-    if prompt := st.chat_input("질문을 입력하세요..."):
+    user_input = st.chat_input("결함 통계나 ISMS-P 가이드라인에 대해 질문해보세요...")
+    
+    prompt = None
+    if user_input:
+        prompt = user_input
+    elif st.session_state.selected_prompt:
+        prompt = st.session_state.selected_prompt
+        st.session_state.selected_prompt = None # 한 번 실행 후 변수 비우기 (중복 실행 방지)
+
+    # prompt가 존재하면 챗봇 답변 생성 시작
+    if prompt:
         # 사용자 메시지 표시 및 저장
         display_message("user", prompt)
         st.session_state.messages.append({"role": "user", "content": prompt})
-
         # 워크플로 실행
         with st.chat_message("assistant"):
             with st.spinner("생각 중..."):
@@ -171,6 +269,9 @@ def main():
 
                     # 워크플로 정보 표시
                     display_workflow_info(result)
+
+                    if result.get("db_results"):
+                        display_visualization(result["db_results"])
 
                     # 어시스턴트 메시지와 워크플로 정보 함께 저장
                     st.session_state.messages.append({
