@@ -5,3 +5,4 @@ __pycache__
 qdrant_db
 database
 ai_service_rag.egg-info
+docs/presentation-prompt.md
