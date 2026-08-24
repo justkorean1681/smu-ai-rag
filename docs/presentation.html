@@ -92,6 +92,11 @@ ul.pts li .sub{display:block;font-size:16px;color:var(--ink-2);margin-top:4px}
 .bar-val{font-size:16px;font-weight:750;color:var(--ink-1)}
 .bar-val small{font-size:12px;color:var(--ink-3);font-weight:600;margin-left:2px}
 .chart-note{font-size:13px;color:var(--ink-3);margin-top:11px;line-height:1.5}
+.define{background:var(--s1-soft);border-left:4px solid var(--s1);border-radius:8px;padding:11px 17px;margin-top:12px}
+.define .t{font-size:12px;font-weight:800;letter-spacing:.12em;color:var(--s1);margin-bottom:4px}
+.define p{font-size:15.5px;line-height:1.55;color:var(--ink-2)}
+.define p+p{margin-top:4px}
+.define b{font-weight:750;color:var(--ink-1)}
 table.data{width:100%;border-collapse:collapse;font-size:16px;margin-top:14px}
 table.data th,table.data td{text-align:left;padding:8px 11px;border-bottom:1px solid var(--rule);vertical-align:top}
 table.data th{font-size:13px;color:var(--ink-2);font-weight:700;background:var(--surface-2)}
@@ -172,8 +177,7 @@ table.data code{font-size:14px;background:var(--surface-3);padding:2px 6px;borde
   <div class="rule"></div>
   <div class="meta">
     264쪽 안내서와 190행 통계표를 <b>한 번에</b> 묻는 AI 에이전트<br>
-    LangGraph · RAG · Text2SQL<br><br>
-    발표자 (AI 에이전트 백엔드 담당) · <span style="color:var(--ink-3)">(발표자 확인 필요: 이름·소속)</span>
+    LangGraph · RAG · Text2SQL
   </div>
   <div class="foot"><span>ISMS-P RAG Agent</span><span>1</span></div>
 </section>
@@ -263,10 +267,15 @@ table.data code{font-size:14px;background:var(--surface-3);padding:2px 6px;borde
   <div class="foot"><span>해결 아이디어</span><span>4</span></div>
 </section>
 
-<section class="slide" data-notes="RAG에 사용한 PDF부터 말씀드리겠습니다. 개인정보보호위원회가 2023년 11월에 발간한 ISMS-P 인증기준 안내서입니다. 264쪽 분량이고, 인증기준 하나하나에 대해 무슨 뜻인지, 어떻게 이행해야 하는지, 심사할 때 뭘 보는지가 서술형으로 적혀 있습니다. 이걸 잘게 쪼개서 벡터로 만들었는데 총 1855개가 나왔습니다. 여기서 한 가지 신경 쓴 게 Parent-Child 방식입니다. 검색은 작은 조각으로 해야 정확한데, 답변을 만들 땐 앞뒤 문맥이 있어야 말이 됩니다. 그래서 작은 조각으로 찾고 그 부모 조각을 가져와 문맥을 넓혔습니다. 그리고 메타데이터에 출처와 페이지를 넣어서, 답변할 때 몇 쪽에서 가져왔는지 표시하게 했습니다. 청중이 직접 검증할 수 있어야 하니까요." data-qa="Q. 왜 유사도 임계값을 0.5로 했나요? / A. 더 낮추면 관련 없는 문단까지 근거로 딸려와 답변 품질이 떨어졌습니다. (발표자 확인 필요: 튜닝 과정을 자세히 물으면)">
+<section class="slide" data-notes="RAG에 사용한 PDF부터 말씀드리겠습니다. 그 전에 ISMS-P가 뭔지 한 줄로 정리하고 가겠습니다. 정보보호 및 개인정보보호 관리체계의 줄임말인데, 기업이나 기관이 정보와 개인정보를 안전하게 지킬 체계를 제대로 갖췄는지 국내 기준에 따라 심사받는 인증 제도입니다. 인증을 받으려면 정해진 인증기준을 항목별로 다 충족해야 하고, 심사에서 못 지킨 부분은 결함으로 기록됩니다. 이 결함이라는 말이 뒤에 계속 나오니까 기억해 주세요. 그래서 저희가 쓴 자료 두 가지가 자연스럽게 나옵니다. 기준을 설명한 문서와, 심사 결과인 결함 통계표입니다. 개인정보보호위원회가 2023년 11월에 발간한 ISMS-P 인증기준 안내서입니다. 264쪽 분량이고, 인증기준 하나하나에 대해 무슨 뜻인지, 어떻게 이행해야 하는지, 심사할 때 뭘 보는지가 서술형으로 적혀 있습니다. 이걸 잘게 쪼개서 벡터로 만들었는데 총 1855개가 나왔습니다. 여기서 한 가지 신경 쓴 게 Parent-Child 방식입니다. 검색은 작은 조각으로 해야 정확한데, 답변을 만들 땐 앞뒤 문맥이 있어야 말이 됩니다. 그래서 작은 조각으로 찾고 그 부모 조각을 가져와 문맥을 넓혔습니다. 그리고 메타데이터에 출처와 페이지를 넣어서, 답변할 때 몇 쪽에서 가져왔는지 표시하게 했습니다. 청중이 직접 검증할 수 있어야 하니까요." data-qa="Q. 왜 유사도 임계값을 0.5로 했나요? / A. 더 낮추면 관련 없는 문단까지 근거로 딸려와 답변 품질이 떨어졌습니다. (발표자 확인 필요: 튜닝 과정을 자세히 물으면)">
   <div class="kicker">2. RAG에 사용한 PDF 문서</div>
   <h2>ISMS-P 인증기준 안내서 264쪽</h2>
   <div class="body">
+    <div class="define">
+      <div class="t">ISMS-P 란?</div>
+      <p><b>정보보호 및 개인정보보호 관리체계</b> — 기업·기관이 정보와 개인정보를 안전하게 지킬 <b>체계를 제대로 갖췄는지 국내 기준에 따라 심사받는 인증 제도</b>입니다.</p>
+      <p>인증을 받으려면 정해진 <b>인증기준을 항목별로 충족</b>해야 하고, 심사에서 못 지킨 부분은 <b>‘결함’</b>으로 기록됩니다. → <b>이 안내서가 그 인증기준을 풀어 쓴 공식 문서</b>이고, 다음 장의 결함 통계표가 심사 결과입니다.</p>
+    </div>
     <div class="cols wide">
       <div class="card">
         <h3>출처</h3>
@@ -526,34 +535,6 @@ table.data code{font-size:14px;background:var(--surface-3);padding:2px 6px;borde
   <div class="foot"><span>4. 고도화 ③</span><span>12</span></div>
 </section>
 
-<section class="slide" data-notes="나머지 다섯 가지는 빠르게 넘어가겠습니다. 첫째, 두 CSV를 항목번호로 연결하고 있었는데 알고 보니 두 표가 서로 다른 인증체계였습니다. ISMS와 ISMS-P는 번호 체계가 겹쳐서, 1.1.1로 연결하니 전혀 다른 항목 두 개가 동시에 붙어버렸습니다. JOIN을 아예 금지했습니다. 둘째, 새 질문을 해도 이전 턴의 검색 근거가 남아 있어서 섞여 들어갔습니다. 요청마다 초기화하게 했습니다. 셋째, 검증에 실패해서 다시 만드는 과정의 초안까지 화면에 나와서 답변이 세 개 보였습니다. 검증을 통과한 것만 내보내게 했습니다. 넷째, 이게 제일 허무했는데 벡터 검색이 아예 안 됐습니다. 코드에 컬렉션 이름이 박혀 있었는데 실제 이름과 달랐어요. 존재하지 않는 곳을 계속 뒤지고 있었던 겁니다. 환경변수로 뺐습니다. 다섯째, 긴 결과가 중간에 잘려서 근거가 잘린 줄 모르고 답하는 문제도 고쳤습니다.">
-  <div class="kicker">4. 고도화 ④ — 나머지</div>
-  <h2>나머지 5가지</h2>
-  <div class="body">
-    <table class="data" style="font-size:16px">
-      <thead><tr><th style="width:24%">고도화</th><th style="width:38%">겪은 문제</th><th>해결</th></tr></thead>
-      <tbody>
-        <tr><td><b>잘못된 JOIN 제거</b></td>
-            <td>두 CSV가 <b>서로 다른 인증체계</b>(ISMS / ISMS-P)라 번호가 겹침 — <code>1.1.1</code>이 엉뚱한 항목 2개에 동시 연결</td>
-            <td>신뢰할 공통 키가 없으므로 <b>JOIN 금지</b></td></tr>
-        <tr><td><b>요청 단위 상태 초기화</b></td>
-            <td>새 질문에 <b>이전 턴의 검색 근거</b>가 섞여 들어감</td>
-            <td>질문마다 검색·검증 상태를 초기화</td></tr>
-        <tr><td><b>검증 전 초안 비공개</b></td>
-            <td>재생성 과정의 초안까지 노출돼 <b>화면에 답변이 3개</b></td>
-            <td>검증 통과한 답변만 1회 출력</td></tr>
-        <tr><td><b>설정 외부화</b></td>
-            <td>컬렉션명이 코드에 박혀 있었고 실제와 달라 <b>벡터 검색이 전부 빈 결과</b></td>
-            <td>환경변수로 분리 (<code>isms_p</code>)</td></tr>
-        <tr><td><b>결과 잘림 방지</b></td>
-            <td>긴 조회 결과가 중간에 잘려 <b>잘린 근거로 답변</b></td>
-            <td>길이 제한 상향 + 개수·대표항목 형태로 반환</td></tr>
-      </tbody>
-    </table>
-  </div>
-  <div class="foot"><span>4. 고도화 ④</span><span>13</span></div>
-</section>
-
 <section class="slide" data-notes="이제 데모입니다. 팀원이 만든 Streamlit 앱 사이드바에 질문 여덟 개가 버튼으로 들어가 있어서 클릭만 하면 됩니다. 일반 대화 두 개, 가이드라인 문서 검색 세 개, 결함 통계 세 개입니다. 여기서 재미있는 게 하나 있는데, 세 번째 질문은 앱에서는 문서 검색 그룹에 들어가 있지만 실제로는 표 조회로 갑니다. 주요 확인 사항이 CSV 컬럼 이름이라서 아까 말씀드린 규칙 라우팅이 잡아내는 겁니다. 그리고 이 데이터가 실제로 표에 있으니까 그게 맞는 동작입니다. 마지막 아홉 번째는 사이드바에 없어서 직접 입력할 건데, 아까 슬라이드 12에서 말씀드린 동률 이야기를 보여주는 질문입니다. 그럼 시연하겠습니다.">
   <div class="kicker">5. 실시간 데모</div>
   <h2>데모 앱 사이드바의 준비된 질문 8가지</h2>
@@ -587,13 +568,13 @@ table.data code{font-size:14px;background:var(--surface-3);padding:2px 6px;borde
       <span style="color:var(--ink-3)">— 색은 <b>에이전트가 실제로 타는 경로</b> 기준</span>
     </div>
   </div>
-  <div class="foot"><span>5. 데모</span><span>14</span></div>
+  <div class="foot"><span>5. 데모</span><span>13</span></div>
 </section>
 
 <section class="slide demo-big" data-notes="(화면을 데모 앱으로 전환합니다. 사이드바 버튼 순서대로 3번, 6번, 4번을 먼저 누르세요. 3번에서는 워크플로 정보 패널을 펼쳐 의도가 database로 잡힌 것을 보여주면 라우팅 설명이 살아납니다. 6번에서는 결과 아래 시각화 리포트를 펼쳐 주세요. 4번에서는 답변 맨 아래 출처와 페이지 번호를 가리키며 이렇게 검증할 수 있습니다라고 말하면 좋습니다. 시간이 남으면 9번을 직접 입력해 동률 138개와 21개를 보여주세요.)">
   <div class="huge">실시간 데모</div>
   <p class="msg" style="font-size:25px;margin-top:20px">질문 8가지 · 세 경로 모두 확인</p>
-  <div class="foot"><span>5. 데모</span><span>15</span></div>
+  <div class="foot"><span>5. 데모</span><span>14</span></div>
 </section>
 
 <section class="slide" data-notes="마무리하겠습니다. 이번 프로젝트에서 제일 크게 배운 건 세 가지입니다. 첫째, 질문마다 알맞은 데이터 소스로 보내는 라우팅이 답변 품질의 절반을 결정한다는 것. 아무리 좋은 모델을 써도 엉뚱한 자료를 뒤지면 답이 안 나옵니다. 둘째, 계산이 정확해야 하는 질문은 LLM에게 자유를 주면 안 된다는 것. 최소 최대 같은 건 고정 쿼리가 답입니다. 셋째, 생성한 답을 근거와 대조하는 단계가 있어야 안심하고 쓸 수 있다는 것입니다. 그리고 무엇보다, 이 여덟 가지 개선은 전부 직접 질문을 던져보다가 이상한 답을 발견해서 나온 것들입니다. 감사합니다.">
@@ -611,7 +592,7 @@ table.data code{font-size:14px;background:var(--surface-3);padding:2px 6px;borde
     </div>
     <p style="text-align:center;font-size:25px;font-weight:750;margin-top:30px">감사합니다</p>
   </div>
-  <div class="foot"><span>마무리</span><span>16</span></div>
+  <div class="foot"><span>마무리</span><span>15</span></div>
 </section>
 
 <section class="slide" data-notes="(부록 — 발표 중에는 넘기지 않습니다. 데모 직전 준비용입니다.)">
@@ -642,7 +623,7 @@ table.data code{font-size:14px;background:var(--surface-3);padding:2px 6px;borde
     </div>
     <p class="chart-note" style="margin-top:16px"><b>보험:</b> 질문 9개의 정상 응답 화면을 미리 캡처해 두면 어떤 상황에서도 발표를 끝낼 수 있습니다.</p>
   </div>
-  <div class="foot"><span>부록 A</span><span>17</span></div>
+  <div class="foot"><span>부록 A</span><span>16</span></div>
 </section>
 
 <section class="slide" data-notes="(부록 — 시간 배분 참고용)">
@@ -658,18 +639,18 @@ table.data code{font-size:14px;background:var(--surface-3);padding:2px 6px;borde
         <tr><td class="num">5</td><td><b>2. RAG용 PDF</b></td><td class="num">0:50</td><td></td></tr>
         <tr><td class="num">6–7</td><td><b>3. Text2SQL용 CSV</b></td><td class="num">1:20</td><td>7번은 수치만 빠르게</td></tr>
         <tr><td class="num">8</td><td><b>4. 전체 구조</b></td><td class="num">1:00</td><td>도식 위주</td></tr>
-        <tr><td class="num">9–13</td><td><b>4. 고도화 8가지</b></td><td class="num">2:40</td><td>12번(동률)에 가장 오래</td></tr>
-        <tr><td class="num">14–15</td><td><b>5. 데모</b></td><td class="num">3:00</td><td>질문 3·6·4번 필수</td></tr>
-        <tr><td class="num">16</td><td>마무리</td><td class="num">0:20</td><td></td></tr>
-        <tr style="background:var(--surface-2)"><td></td><td><b>합계</b></td><td class="num"><b>12:00</b></td><td style="color:var(--bad)"><b>10분 초과 — 아래로 조정</b></td></tr>
+        <tr><td class="num">9–12</td><td><b>4. 고도화 — 대표 3가지</b></td><td class="num">2:00</td><td>12번(동률)에 가장 오래</td></tr>
+        <tr><td class="num">13–14</td><td><b>5. 데모</b></td><td class="num">3:00</td><td>질문 3·6·4번 필수</td></tr>
+        <tr><td class="num">15</td><td>마무리</td><td class="num">0:20</td><td></td></tr>
+        <tr style="background:var(--surface-2)"><td></td><td><b>합계</b></td><td class="num"><b>11:20</b></td><td style="color:var(--bad)"><b>10분 초과 — 아래로 조정</b></td></tr>
       </tbody>
     </table>
     <ul class="pts" style="margin-top:16px;font-size:18px">
-      <li><b>10분에 맞추려면:</b> 슬라이드 7(결함 차트)과 13(나머지 5가지)을 건너뛰고 고도화는 <b>①③만</b> 설명 <span class="sub">→ 약 9분 40초</span></li>
+      <li><b>10분에 맞추려면:</b> 슬라이드 7(결함 차트)을 건너뛰고 고도화는 <b>①③만</b> 설명 <span class="sub">→ 약 10분</span></li>
       <li>데모가 밀릴 것에 대비해 <b>질문 3번 · 6번 · 4번을 먼저</b> 누르세요 (라우팅 + 시각화 + 출처 표기)</li>
     </ul>
   </div>
-  <div class="foot"><span>부록 B</span><span>18</span></div>
+  <div class="foot"><span>부록 B</span><span>17</span></div>
 </section>
 
 </div></div>
