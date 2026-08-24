@@ -173,26 +173,3 @@ datasets/          PDF 원문과 CSV 2종
 examples/          수업 진행용 노트북 템플릿
 docs/              발표자료 (presentation.html)
 ```
-
----
-
-## 문제 해결
-
-**문서 검색이 항상 빈 결과입니다**
-Qdrant 컬렉션명을 먼저 확인하세요. 실제 컬렉션은 `isms_p`입니다.
-`QDRANT_COLLECTION_NAME`이 다른 값으로 설정돼 있으면 존재하지 않는 컬렉션을 조회하게 됩니다.
-
-**설정을 바꿨는데 반영되지 않습니다**
-retriever와 Text2SQL 엔진은 모듈 전역에 캐시됩니다. **서버를 완전히 종료 후 재시작**해야 합니다.
-
-**콘솔에 한글이 `????`로 보입니다**
-Windows 콘솔 인코딩 문제일 뿐 데이터는 정상입니다. `.env`에 `PYTHONUTF8=1`을 두거나
-명령 앞에 `PYTHONIOENCODING=utf-8`을 붙여 실행하세요.
-
-**같은 질문에 답이 매번 다릅니다**
-최소·최대·순위 질문은 고정 SQL로 처리하도록 되어 있습니다(`text2sql.py`의 `_get_deterministic_sql`).
-그 외 질문은 LLM이 SQL을 생성하므로 표현이 달라질 수 있습니다.
-
-**표에 있는 내용인데 "근거가 부족하다"고 답합니다**
-질문이 문서 검색으로 잘못 라우팅됐을 가능성이 큽니다. 위 **라우팅 규칙 점검**으로 확인하고,
-필요하면 `nodes.py`의 `DATABASE_FIELD_TERMS` 또는 `DATABASE_AGGREGATION_TERMS`에 신호어를 추가하세요.
