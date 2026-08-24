@@ -34,6 +34,7 @@ DATABASE_FIELD_TERMS = (
 DATABASE_AGGREGATION_TERMS = (
     "몇 건",
     "몇 개",
+    "몇 곳",
     "개수",
     "건수",
     "합계",
@@ -41,11 +42,17 @@ DATABASE_AGGREGATION_TERMS = (
     "통계",
     "비율",
     "비중",
-    "가장 많",
-    "가장 적",
+    "최다",
+    "상위",
+    "하위",
+    "top",
     "순위",
     "비교",
 )
+# "가장 결함이 많이 발생한"처럼 최상급과 형용사 사이에 다른 말이 끼는 표현을 잡습니다.
+# "많이"·"적게"를 단독 신호어로 두면 "결함이 많이 나는 항목은 어떻게 개선하나요"처럼
+# 이행 방법을 묻는 질문까지 DB로 보내므로, 최상급이 함께 있을 때만 집계로 판단합니다.
+DATABASE_SUPERLATIVE_PATTERN = re.compile(r"가장.{0,8}(많|적)")
 VECTOR_EXPLANATION_TERMS = (
     "어떻게",
     "방법",
@@ -140,9 +147,12 @@ def _is_database_question(question: str) -> bool:
         return True
 
     # 결함에 대한 수치·통계 질문은 isms_defects 조회
-    if "결함" in compact_question and any(
-        _compact_text(term) in compact_question
-        for term in DATABASE_AGGREGATION_TERMS
+    if "결함" in compact_question and (
+        any(
+            _compact_text(term) in compact_question
+            for term in DATABASE_AGGREGATION_TERMS
+        )
+        or DATABASE_SUPERLATIVE_PATTERN.search(compact_question)
     ):
         return True
 
