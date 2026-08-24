@@ -1,3 +1,8 @@
+import csv
+import re
+from functools import lru_cache
+from pathlib import Path
+
 from langchain.chat_models import init_chat_model
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from ai.state import AgentState
@@ -13,6 +18,45 @@ llm = init_chat_model("gpt-5.4-mini")
 
 _retriever = None
 _text2sql_engine = None
+
+DATABASE_FIELD_TERMS = (
+    "상세내용",
+    "상세 내용",
+    "주요 확인사항",
+    "주요확인사항",
+    "결함수",
+    "결함 수",
+    "항목번호",
+    "항목 번호",
+    "항목명",
+    "분야명",
+)
+DATABASE_AGGREGATION_TERMS = (
+    "몇 건",
+    "몇 개",
+    "개수",
+    "건수",
+    "합계",
+    "평균",
+    "통계",
+    "비율",
+    "비중",
+    "가장 많",
+    "가장 적",
+    "순위",
+    "비교",
+)
+VECTOR_EXPLANATION_TERMS = (
+    "어떻게",
+    "방법",
+    "사례",
+    "심사 관점",
+    "적용",
+    "이행",
+    "절차",
+    "왜",
+    "의미",
+)
 
 
 class VectorSearchQuery(BaseModel):
@@ -52,6 +96,61 @@ def get_cached_text2sql_engine():
     return _text2sql_engine
 
 
+def _compact_text(value: str) -> str:
+    """라우팅 비교를 위해 공백과 영문 대소문자를 정규화합니다."""
+    return re.sub(r"\s+", "", value).lower()
+
+
+@lru_cache(maxsize=1)
+def _get_dataset_terms() -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """CSV에 실제 존재하는 분야명과 항목명을 라우팅 기준으로 캐시합니다."""
+    csv_path = Path(__file__).resolve().parents[2] / "datasets" / "isms_items.csv"
+    if not csv_path.is_file():
+        return (), ()
+
+    field_names = set()
+    item_names = set()
+    with csv_path.open("r", encoding="utf-8-sig", newline="") as csv_file:
+        for row in csv.DictReader(csv_file):
+            field_name = _compact_text(row.get("분야명", "").strip())
+            item_name = _compact_text(row.get("항목명", "").strip())
+            if field_name:
+                field_names.add(field_name)
+            if item_name:
+                item_names.add(item_name)
+
+    return tuple(field_names), tuple(item_names)
+
+
+def _is_database_question(question: str) -> bool:
+    """CSV의 명시적 필드·값 조회 질문을 LLM보다 우선하여 판별합니다."""
+    compact_question = _compact_text(question)
+
+    # CSV 컬럼을 직접 지정한 질문은 항상 정형 데이터 조회
+    if any(_compact_text(term) in compact_question for term in DATABASE_FIELD_TERMS):
+        return True
+
+    # 결함에 대한 수치·통계 질문은 isms_defects 조회
+    if "결함" in compact_question and any(
+        _compact_text(term) in compact_question
+        for term in DATABASE_AGGREGATION_TERMS
+    ):
+        return True
+
+    field_names, item_names = _get_dataset_terms()
+    mentions_dataset_value = any(
+        term in compact_question for term in (*field_names, *item_names)
+    )
+    asks_for_explanation = any(
+        _compact_text(term) in compact_question
+        for term in VECTOR_EXPLANATION_TERMS
+    )
+
+    # CSV에 실제 존재하는 분야명/항목명의 단순 조회는 DB로 보내되,
+    # 이행 방법·사례·의미를 묻는 질문은 안내서 검색에 남김
+    return mentions_dataset_value and not asks_for_explanation
+
+
 def classify_intent(state: AgentState) -> AgentState:
     """
     사용자 질문의 의도를 분류하는 노드
@@ -72,8 +171,21 @@ def classify_intent(state: AgentState) -> AgentState:
     if not messages:
         raise ValueError("No messages provided")
 
-    # 마지막 사용자 메시지를 질문으로 사용
-    question = messages[-1].content if hasattr(messages[-1], 'content') else str(messages[-1])
+    # 전체 히스토리에서 마지막 사용자 메시지를 질문으로 사용
+    last_human_message = next(
+        (message for message in reversed(messages) if isinstance(message, HumanMessage)),
+        messages[-1],
+    )
+    question_content = (
+        last_human_message.content
+        if hasattr(last_human_message, "content")
+        else str(last_human_message)
+    )
+    question = (
+        question_content
+        if isinstance(question_content, str)
+        else str(question_content)
+    )
 
     system_prompt = """
 당신은 ISMS-P 질의응답 에이전트의 라우팅 전문가입니다.
@@ -86,7 +198,7 @@ def classify_intent(state: AgentState) -> AgentState:
 2. 'database' - CSV 데이터의 정확한 행 조회, 목록, 개수, 합계, 비교, 순위 또는 결함 통계가 필요한 질문
    - isms_items: 분야, 분야명, 항목번호, 항목명, 상세내용, 주요 확인사항
    - isms_defects: 통제분야, 통제영역, 통제항목, 결함수, 비율, 비중, 합계
-   예: "법적요구사항 준수검토의 결함수는?", "결함이 가장 많은 통제영역은?", "1.1.1 항목의 주요 확인사항은?"
+   예: "법적요구사항 준수검토의 결함수는?", "결함이 가장 많은 통제영역은?", "1.1.1 항목의 주요 확인사항은?", "관리체계 기반 마련의 경영진 참여 상세내용은?"
 
 3. 'vector' - ISMS-P 인증기준 안내서의 설명, 적용 방법, 요구사항, 사례 또는 심사 관점 등 문서 내용 검색이 필요한 질문
    예: "위험관리는 어떻게 수행해야 하나요?", "직무분리가 어려우면 어떤 보완통제가 필요한가요?", "재해 발생 시 어떻게 대처해야 하나요?"
@@ -95,17 +207,20 @@ def classify_intent(state: AgentState) -> AgentState:
 - 수치 계산과 통계가 핵심이면 'database'를 우선하세요.
 - 기준의 의미나 이행 방법에 대한 설명이 핵심이면 'vector'를 선택하세요.
 - ISMS-P의 정의·목적을 간단히 소개해 달라는 요청은 'general'로 분류하세요.
-- 특정 인증기준, 통제항목, 보호조치 또는 심사내용이 포함되면 'general'이 아니라 'vector'로 분류하세요.
+- CSV의 컬럼명이나 특정 항목의 상세내용·주요 확인사항을 묻는다면 'database'로 분류하세요.
+- 특정 기준을 어떻게 이행하는지, 실제 적용 방법·사례·심사 관점을 묻는다면 'vector'로 분류하세요.
 
 반드시 'general', 'database', 'vector' 중 하나만 답변하세요.
 다른 설명 없이 분류 결과만 반환하세요.
 """
 
-    # 시스템 메시지 + 전체 대화 히스토리
-    conversation = [SystemMessage(content=system_prompt)] + messages
-
-    response = llm.invoke(conversation)
-    intent = response.content.strip().lower()
+    if _is_database_question(question):
+        intent = "database"
+    else:
+        # 명시적인 CSV 조회가 아닐 때만 LLM으로 의도를 분류
+        conversation = [SystemMessage(content=system_prompt)] + messages
+        response = llm.invoke(conversation)
+        intent = response.content.strip().lower()
 
     # 유효한 의도인지 확인
     if intent not in ['general', 'database', 'vector']:

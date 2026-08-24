@@ -1,20 +1,82 @@
 import os
+from pathlib import Path
+
+import pandas as pd
 from langchain_community.utilities import SQLDatabase
 from langchain.chat_models import init_chat_model
 from langchain_core.messages import SystemMessage, HumanMessage
+from sqlalchemy import create_engine
+from sqlalchemy.pool import StaticPool
 
 
 class Text2SQLEngine:
     def __init__(self):
         """Text2SQL 엔진 초기화"""
-        # Supabase 데이터베이스 연결
-        self.db = SQLDatabase.from_uri(os.getenv("SUPABASE_DB_URL"))
+        # 기본값은 Supabase이며, local 설정 시 프로젝트 CSV를 사용
+        self.db = self._create_database()
 
         # LLM 초기화
         self.llm = init_chat_model("gpt-5.4-mini")
 
         # 데이터베이스 스키마 정보 캐싱
         self.schema_info = self.db.get_table_info()
+        self.sql_dialect = "SQLite" if self.db.dialect == "sqlite" else "PostgreSQL"
+
+    def _create_database(self) -> SQLDatabase:
+        """설정에 따라 로컬 CSV 또는 Supabase 데이터베이스를 구성합니다."""
+        database_source = os.getenv("ISMS_DB_SOURCE", "supabase").strip().lower()
+
+        if database_source == "supabase":
+            database_url = os.getenv("SUPABASE_DB_URL")
+            if not database_url:
+                raise ValueError(
+                    "ISMS_DB_SOURCE가 supabase이지만 SUPABASE_DB_URL이 설정되지 않았습니다."
+                )
+            return SQLDatabase.from_uri(database_url)
+
+        if database_source != "local":
+            raise ValueError("ISMS_DB_SOURCE는 local 또는 supabase만 사용할 수 있습니다.")
+
+        project_root = Path(__file__).resolve().parents[2]
+        datasets_dir = project_root / "datasets"
+        dataset_paths = {
+            "isms_items": datasets_dir / "isms_items.csv",
+            "isms_defects": datasets_dir / "isms_defects.csv",
+        }
+
+        missing_files = [
+            path.name for path in dataset_paths.values() if not path.is_file()
+        ]
+        if missing_files:
+            raise FileNotFoundError(
+                f"datasets 폴더에서 다음 파일을 찾을 수 없습니다: {', '.join(missing_files)}"
+            )
+
+        # StaticPool을 사용해 모든 조회가 동일한 인메모리 DB를 보도록 유지
+        engine = create_engine(
+            "sqlite://",
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+        )
+
+        for table_name, csv_path in dataset_paths.items():
+            dataframe = pd.read_csv(
+                csv_path,
+                encoding="utf-8-sig",
+                keep_default_na=False,
+            )
+            dataframe.to_sql(
+                table_name,
+                engine,
+                if_exists="replace",
+                index=False,
+            )
+
+        return SQLDatabase(
+            engine,
+            include_tables=list(dataset_paths),
+            sample_rows_in_table_info=3,
+        )
 
     def generate_sql(self, question: str, feedback: str = None) -> str:
         """
@@ -28,7 +90,7 @@ class Text2SQLEngine:
             생성된 SQL 쿼리
         """
         system_prompt = f"""
-당신은 PostgreSQL 전문가입니다.
+당신은 {self.sql_dialect} 전문가입니다.
 사용자의 질문을 정확한 SQL 쿼리로 변환하세요.
 
 <database_schema>
@@ -41,7 +103,7 @@ class Text2SQLEngine:
 </table_descriptions>
 
 <rules>
-- PostgreSQL 문법을 사용하세요
+- {self.sql_dialect} 문법을 사용하세요
 - SELECT 쿼리만 생성하세요 (INSERT, UPDATE, DELETE 금지)
 - 결과는 최대 10개로 제한하세요 (LIMIT 10)
 - SQL 쿼리만 반환하고, 설명은 포함하지 마세요
