@@ -173,3 +173,4 @@ datasets/          PDF 원문과 CSV 2종
 examples/          수업 진행용 노트북 템플릿
 docs/              발표자료 (presentation.html)
 ```
+<img width="675" height="422" alt="image" src="https://github.com/user-attachments/assets/d7ced8aa-d9f6-45ba-a8af-d076f5e865db" />
