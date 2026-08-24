@@ -14,7 +14,7 @@ class ParentDocumentRetriever:
         self.embeddings = embeddings
         self.child_collection = os.getenv(
             "QDRANT_COLLECTION_NAME",
-            "team1_isms_p"
+            "isms_p"
         )
 
         # Child vectorstore
@@ -145,7 +145,7 @@ class MetadataFilteredRetriever:
         self.embeddings = embeddings
         self.collection_name = os.getenv(
             "QDRANT_COLLECTION_NAME",
-            "team1_isms_p"
+            "isms_p"
         )
 
         # Vectorstore

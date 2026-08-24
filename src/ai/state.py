@@ -28,3 +28,4 @@ class AgentState(MessagesState):
     answer_valid: Optional[bool] # 답변이 검색 근거와 일치하는지 여부
     answer_feedback: Optional[str] # 재생성 시 반영할 검증 피드백
     answer_retry_count: Optional[int] # 검증 실패 후 답변 재생성 횟수
+    draft_answer: Optional[str] # 검증을 통과하기 전의 비공개 답변 초안

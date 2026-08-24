@@ -50,6 +50,15 @@ VECTOR_EXPLANATION_TERMS = (
     "어떻게",
     "방법",
     "사례",
+    "가이드",
+    "가이드라인",
+    "필수 항목",
+    "필수항목",
+    "점검",
+    "주의사항",
+    "권고",
+    "규칙",
+    "주기",
     "심사 관점",
     "적용",
     "이행",
@@ -151,6 +160,15 @@ def _is_database_question(question: str) -> bool:
     return mentions_dataset_value and not asks_for_explanation
 
 
+def _is_vector_question(question: str) -> bool:
+    """가이드·이행·점검 성격의 문서 질문을 결정적으로 판별합니다."""
+    compact_question = _compact_text(question)
+    return any(
+        _compact_text(term) in compact_question
+        for term in VECTOR_EXPLANATION_TERMS
+    )
+
+
 def classify_intent(state: AgentState) -> AgentState:
     """
     사용자 질문의 의도를 분류하는 노드
@@ -201,14 +219,14 @@ def classify_intent(state: AgentState) -> AgentState:
    예: "법적요구사항 준수검토의 결함수는?", "결함이 가장 많은 통제영역은?", "1.1.1 항목의 주요 확인사항은?", "관리체계 기반 마련의 경영진 참여 상세내용은?"
 
 3. 'vector' - ISMS-P 인증기준 안내서의 설명, 적용 방법, 요구사항, 사례 또는 심사 관점 등 문서 내용 검색이 필요한 질문
-   예: "위험관리는 어떻게 수행해야 하나요?", "직무분리가 어려우면 어떤 보완통제가 필요한가요?", "재해 발생 시 어떻게 대처해야 하나요?"
+   예: "비밀번호 생성 규칙과 변경 주기 가이드라인은?", "개인정보 처리방침 공개 시 필수 항목은?", "클라우드 서비스 이용 시 보안 점검사항은?"
 
 판단 규칙:
 - 수치 계산과 통계가 핵심이면 'database'를 우선하세요.
 - 기준의 의미나 이행 방법에 대한 설명이 핵심이면 'vector'를 선택하세요.
 - ISMS-P의 정의·목적을 간단히 소개해 달라는 요청은 'general'로 분류하세요.
 - CSV의 컬럼명이나 특정 항목의 상세내용·주요 확인사항을 묻는다면 'database'로 분류하세요.
-- 특정 기준을 어떻게 이행하는지, 실제 적용 방법·사례·심사 관점을 묻는다면 'vector'로 분류하세요.
+- 특정 기준의 가이드라인, 필수 요구사항, 점검사항, 규칙·주기, 이행 방법·사례·심사 관점을 묻는다면 'vector'로 분류하세요.
 
 반드시 'general', 'database', 'vector' 중 하나만 답변하세요.
 다른 설명 없이 분류 결과만 반환하세요.
@@ -216,6 +234,8 @@ def classify_intent(state: AgentState) -> AgentState:
 
     if _is_database_question(question):
         intent = "database"
+    elif _is_vector_question(question):
+        intent = "vector"
     else:
         # 명시적인 CSV 조회가 아닐 때만 LLM으로 의도를 분류
         conversation = [SystemMessage(content=system_prompt)] + messages
@@ -240,6 +260,7 @@ def classify_intent(state: AgentState) -> AgentState:
         "answer_valid": None,
         "answer_feedback": None,
         "answer_retry_count": 0,
+        "draft_answer": None,
     }
 
 
@@ -518,6 +539,9 @@ def generate_answer(state: AgentState) -> AgentState:
 - 근거에 없는 법령, 의무, 예외, 제재, 수치 또는 사례를 추측하지 마세요.
 - 문서 검색 결과를 사용했다면 답변 말미에 확인 가능한 출처와 페이지를 표시하세요.
 - DB 조회 결과를 사용했다면 결과의 숫자와 분류를 정확히 전달하되 SQL 자체는 답변에 포함하지 마세요.
+- 최소·최대 결함수에 동률 항목이 여러 개면 하나를 임의로 고르지 말고 동률 개수와 항목들을 설명하세요.
+- 대표항목이 최대 10개로 제공되면 전체 목록이라고 표현하지 말고 예시임을 밝히세요.
+- 0건 포함 여부에 따라 결과가 달라지는 근거라면 두 범위를 명확히 구분하세요.
 - 질문에 필요한 근거가 부족하면 부족한 부분을 분명히 밝히고 확인되지 않은 내용을 만들지 마세요.
 - 이전 대화 맥락을 고려하되 현재 제공된 근거보다 우선하지 마세요.
 - 한국어로 명확하고 간결하게 답변하세요.
@@ -538,19 +562,14 @@ def generate_answer(state: AgentState) -> AgentState:
         answer_retry_count += 1
 
     return {
-        "messages": [AIMessage(content=answer)],
+        "draft_answer": answer,
         "answer_retry_count": answer_retry_count
     }
 
 
 def final_query(state: AgentState) -> AgentState:
     """생성된 답변이 검색 근거에 충실한지 독립적으로 검증합니다."""
-    messages = state.get("messages", [])
-    generated_answer = ""
-    for message in reversed(messages):
-        if isinstance(message, AIMessage):
-            generated_answer = str(message.content)
-            break
+    generated_answer = state.get("draft_answer", "")
 
     if not generated_answer:
         return {
@@ -570,6 +589,7 @@ def final_query(state: AgentState) -> AgentState:
 3. 검색 근거에 없는 법적 의무, 예외, 제재, 수치 또는 단정적인 조언을 추가하지 않았는가
 4. 문서 기반 답변의 출처와 페이지가 실제 제공된 근거와 일치하는가
 5. 근거가 부족한 경우 그 한계를 솔직하게 밝혔는가
+6. 최소·최대·순위 질문에서 전체 결과와 동률을 확인하고 임의의 한 항목만 선택하지 않았는가
 
 표현 방식이나 문장 길이의 사소한 차이만으로 부적합 판정하지 마세요.
 부적합한 경우 feedback에 틀린 부분과 수정 방법을 구체적으로 작성하세요.
@@ -594,10 +614,16 @@ def final_query(state: AgentState) -> AgentState:
         HumanMessage(content=user_prompt)
     ])
 
-    return {
+    result = {
         "answer_valid": validation.is_valid,
         "answer_feedback": validation.feedback
     }
+
+    # 첫 검증 통과 또는 1회 재생성 완료 후에만 사용자 메시지에 최종 답변 추가
+    if validation.is_valid or state.get("answer_retry_count", 0) >= 1:
+        result["messages"] = [AIMessage(content=generated_answer)]
+
+    return result
 
 
 def route_by_intent(state: AgentState) -> str:

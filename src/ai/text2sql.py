@@ -32,7 +32,10 @@ class Text2SQLEngine:
                 raise ValueError(
                     "ISMS_DB_SOURCE가 supabase이지만 SUPABASE_DB_URL이 설정되지 않았습니다."
                 )
-            return SQLDatabase.from_uri(database_url)
+            return SQLDatabase.from_uri(
+                database_url,
+                max_string_length=2000,
+            )
 
         if database_source != "local":
             raise ValueError("ISMS_DB_SOURCE는 local 또는 supabase만 사용할 수 있습니다.")
@@ -76,7 +79,153 @@ class Text2SQLEngine:
             engine,
             include_tables=list(dataset_paths),
             sample_rows_in_table_info=3,
+            max_string_length=2000,
         )
+
+    def _get_deterministic_sql(self, question: str) -> str | None:
+        """최소·최대 결함 질문은 동률을 보존하는 고정 SQL로 처리합니다."""
+        normalized_question = "".join(question.lower().split())
+        if "결함" not in normalized_question:
+            return None
+
+        asks_for_minimum = any(
+            term in normalized_question
+            for term in ("가장적", "최소", "제일적")
+        )
+        asks_for_maximum = any(
+            term in normalized_question
+            for term in ("가장많", "최대", "제일많")
+        )
+
+        aggregate_function = "STRING_AGG" if self.db.dialect != "sqlite" else "GROUP_CONCAT"
+
+        if asks_for_minimum:
+            if self.db.dialect == "sqlite":
+                return f"""
+WITH scopes AS (
+    SELECT '전체 항목(0건 포함)' AS "비교범위", MIN("결함수") AS "기준결함수"
+    FROM isms_defects
+    UNION ALL
+    SELECT '결함 발생 항목(0건 제외)' AS "비교범위", MIN("결함수") AS "기준결함수"
+    FROM isms_defects
+    WHERE "결함수" > 0
+),
+matches AS (
+    SELECT
+        s."비교범위",
+        s."기준결함수",
+        d."통제분야",
+        d."통제항목",
+        ROW_NUMBER() OVER (
+            PARTITION BY s."비교범위"
+            ORDER BY d."통제분야", d."통제항목"
+        ) AS "순번",
+        COUNT(*) OVER (PARTITION BY s."비교범위") AS "동률항목수"
+    FROM scopes s
+    JOIN isms_defects d ON d."결함수" = s."기준결함수"
+)
+SELECT
+    "비교범위",
+    "기준결함수" AS "결함수",
+    MAX("동률항목수") AS "동률항목수",
+    {aggregate_function}(
+        CASE WHEN "순번" <= 10 THEN "통제분야" || ' > ' || "통제항목" END,
+        ' | '
+    ) AS "대표항목(최대10개)"
+FROM matches
+GROUP BY "비교범위", "기준결함수"
+ORDER BY "기준결함수";
+""".strip()
+
+            return f"""
+WITH scopes AS (
+    SELECT '전체 항목(0건 포함)' AS "비교범위", MIN("결함수") AS "기준결함수"
+    FROM isms_defects
+    UNION ALL
+    SELECT '결함 발생 항목(0건 제외)' AS "비교범위", MIN("결함수") AS "기준결함수"
+    FROM isms_defects
+    WHERE "결함수" > 0
+),
+matches AS (
+    SELECT
+        s."비교범위",
+        s."기준결함수",
+        d."통제분야",
+        d."통제항목",
+        ROW_NUMBER() OVER (
+            PARTITION BY s."비교범위"
+            ORDER BY d."통제분야", d."통제항목"
+        ) AS "순번",
+        COUNT(*) OVER (PARTITION BY s."비교범위") AS "동률항목수"
+    FROM scopes s
+    JOIN isms_defects d ON d."결함수" = s."기준결함수"
+)
+SELECT
+    "비교범위",
+    "기준결함수" AS "결함수",
+    MAX("동률항목수") AS "동률항목수",
+    {aggregate_function}(
+        CASE WHEN "순번" <= 10 THEN "통제분야" || ' > ' || "통제항목" END,
+        ' | ' ORDER BY "순번"
+    ) AS "대표항목(최대10개)"
+FROM matches
+GROUP BY "비교범위", "기준결함수"
+ORDER BY "기준결함수";
+""".strip()
+
+        if asks_for_maximum:
+            if self.db.dialect == "sqlite":
+                return f"""
+WITH target AS (
+    SELECT MAX("결함수") AS "기준결함수" FROM isms_defects
+),
+matches AS (
+    SELECT
+        t."기준결함수",
+        d."통제분야",
+        d."통제항목",
+        ROW_NUMBER() OVER (ORDER BY d."통제분야", d."통제항목") AS "순번",
+        COUNT(*) OVER () AS "동률항목수"
+    FROM target t
+    JOIN isms_defects d ON d."결함수" = t."기준결함수"
+)
+SELECT
+    "기준결함수" AS "결함수",
+    MAX("동률항목수") AS "동률항목수",
+    {aggregate_function}(
+        CASE WHEN "순번" <= 10 THEN "통제분야" || ' > ' || "통제항목" END,
+        ' | '
+    ) AS "대표항목(최대10개)"
+FROM matches
+GROUP BY "기준결함수";
+""".strip()
+
+            return f"""
+WITH target AS (
+    SELECT MAX("결함수") AS "기준결함수" FROM isms_defects
+),
+matches AS (
+    SELECT
+        t."기준결함수",
+        d."통제분야",
+        d."통제항목",
+        ROW_NUMBER() OVER (ORDER BY d."통제분야", d."통제항목") AS "순번",
+        COUNT(*) OVER () AS "동률항목수"
+    FROM target t
+    JOIN isms_defects d ON d."결함수" = t."기준결함수"
+)
+SELECT
+    "기준결함수" AS "결함수",
+    MAX("동률항목수") AS "동률항목수",
+    {aggregate_function}(
+        CASE WHEN "순번" <= 10 THEN "통제분야" || ' > ' || "통제항목" END,
+        ' | ' ORDER BY "순번"
+    ) AS "대표항목(최대10개)"
+FROM matches
+GROUP BY "기준결함수";
+""".strip()
+
+        return None
 
     def generate_sql(self, question: str, feedback: str = None) -> str:
         """
@@ -89,6 +238,10 @@ class Text2SQLEngine:
         Returns:
             생성된 SQL 쿼리
         """
+        deterministic_sql = self._get_deterministic_sql(question)
+        if deterministic_sql:
+            return deterministic_sql
+
         system_prompt = f"""
 당신은 {self.sql_dialect} 전문가입니다.
 사용자의 질문을 정확한 SQL 쿼리로 변환하세요.
@@ -105,7 +258,7 @@ class Text2SQLEngine:
 <rules>
 - {self.sql_dialect} 문법을 사용하세요
 - SELECT 쿼리만 생성하세요 (INSERT, UPDATE, DELETE 금지)
-- 결과는 최대 10개로 제한하세요 (LIMIT 10)
+- 일반 목록 결과는 최대 10개로 제한하세요 (LIMIT 10)
 - SQL 쿼리만 반환하고, 설명은 포함하지 마세요
 - 코드 블록(```)이나 'sql' 키워드 없이 순수 쿼리만 반환하세요
 - NULL 값을 주의해서 처리하세요
@@ -113,10 +266,11 @@ class Text2SQLEngine:
 - 한글 컬럼명은 반드시 큰따옴표로 감싸세요
 - 문자열 검색은 표기와 띄어쓰기 차이를 고려하여 필요한 경우 LIKE와 %를 사용하세요
 - 합계는 결과가 없을 때도 0이 되도록 COALESCE(SUM(...), 0)를 사용하세요
-- isms_items의 "항목번호"(예: 1.1.1)와 isms_defects의 "통제항목"(예: 1.1.1 정책의 수립)을 연결할 때는
-  d."통제항목" LIKE i."항목번호" || '%' 조건을 사용하세요
-- ISMS와 ISMS-P 항목이 함께 존재할 수 있으므로 질문에 지정된 통제분야와 항목명을 임의로 혼합하지 마세요
-- JOIN이 필요한 경우 적절히 사용하세요
+- 결함 통계 질문은 isms_defects만 사용하고, 인증기준의 상세내용·주요 확인사항 질문은 isms_items만 사용하세요
+- 두 테이블은 서로 다른 인증체계의 번호가 섞여 있고 신뢰할 수 있는 공통 키가 없으므로 JOIN하지 마세요
+- 최소·최대 질문은 LIMIT 1로 임의의 한 행만 고르지 말고 같은 결함수의 동률 항목을 모두 반영하세요
+- "가장 적게 발생"처럼 0건 포함 여부가 모호하면 0건 포함 결과와 0건 제외 결과를 구분하세요
+- ISMS와 ISMS-P의 통제분야와 항목명을 임의로 혼합하지 마세요
 - 세미콜론(;)으로 쿼리를 종료하세요
 </rules>
 """
