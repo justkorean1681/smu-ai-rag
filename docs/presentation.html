@@ -303,7 +303,7 @@ table.data code{font-size:14px;background:var(--surface-3);padding:2px 6px;borde
   <div class="foot"><span>2. RAG용 PDF</span><span>5</span></div>
 </section>
 
-<section class="slide" data-notes="다음은 Text2SQL에 사용한 CSV 두 개입니다. 첫 번째는 인증기준 항목표로 65행입니다. 분야명, 항목번호, 항목명, 상세내용, 주요 확인사항 이렇게 여섯 개 컬럼이 있고, 예를 들어 1.1.1 경영진의 참여 같은 항목이 들어 있습니다. 이건 특정 행을 정확히 짚는 조회에 씁니다. 두 번째는 KISA의 결함 통계표로 190행입니다. 통제분야, 통제영역, 통제항목, 결함수 네 개 컬럼이고 이건 개수나 합계, 순위 같은 집계형 질문에 씁니다. 한 가지 실용적인 장치를 넣었는데, 환경변수 하나로 Supabase 대신 로컬 CSV를 쓸 수 있게 했습니다. 오늘처럼 인터넷이 불안한 발표장에서도 데모가 돌아가게 하려고요.">
+<section class="slide" data-notes="다음은 Text2SQL에 사용한 CSV 두 개입니다. 첫 번째는 인증기준 항목표로 65행입니다. 분야명, 항목번호, 항목명, 상세내용, 주요 확인사항 이렇게 여섯 개 컬럼이 있고, 예를 들어 1.1.1 경영진의 참여 같은 항목이 들어 있습니다. 이건 특정 행을 정확히 짚는 조회에 씁니다. 두 번째는 KISA의 결함 통계표로 190행입니다. 통제분야, 통제영역, 통제항목, 결함수 네 개 컬럼이고 이건 개수나 합계, 순위 같은 집계형 질문에 씁니다.">
   <div class="kicker">3. Text2SQL에 사용한 CSV 문서</div>
   <h2>성격이 다른 표 2개</h2>
   <div class="body">
@@ -324,15 +324,10 @@ table.data code{font-size:14px;background:var(--surface-3);padding:2px 6px;borde
         </tr>
       </tbody>
     </table>
-    <div class="cols" style="margin-top:20px">
+    <div style="margin-top:20px">
       <div class="card">
         <h3>예시 — 인증기준 항목표</h3>
         <p style="font-size:16px">분야명 <b>관리체계 기반 마련</b> · 항목번호 <b>1.1.1</b> · 항목명 <b>경영진의 참여</b></p>
-      </div>
-      <div class="card good">
-        <h3>발표장 대비 장치</h3>
-        <p style="font-size:16px;color:var(--ink-1)">환경변수 하나로 <b>Supabase ↔ 로컬 CSV</b> 전환<br>
-        <span style="color:var(--ink-2)">네트워크 없이도 데모가 동작합니다</span></p>
       </div>
     </div>
   </div>
